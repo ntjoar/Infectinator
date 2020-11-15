@@ -9,6 +9,11 @@ export class Assignment3 extends Scene {
         // constructor(): Scenes begin by populating initial values like the Shapes and Materials they'll need.
         super();
 
+        this.torusLocation = {
+            x: 0,
+            y: 0
+        }
+
         // At the beginning of our program, load one of each of these shape definitions onto the GPU.
         this.shapes = {
             torus: new defs.Torus(15, 15),
@@ -45,6 +50,19 @@ export class Assignment3 extends Scene {
         this.new_line();
         this.key_triggered_button("Attach to planet 5", ["Control", "5"], () => this.attached = () => this.planet_5);
         this.key_triggered_button("Attach to moon", ["Control", "m"], () => this.attached = () => this.moon);
+
+        this.key_triggered_button("Left", ["a"], () => {
+            this.torusLocation.x += -0.5
+        });
+        this.key_triggered_button("Right", ["d"], () => {
+            this.torusLocation.x += 0.5
+        });
+        this.key_triggered_button("Up", ["w"], () => {
+            this.torusLocation.y += 0.5
+        });
+        this.key_triggered_button("Down", ["s"], () => {
+            this.torusLocation.y += -0.5
+        });
     }
 
     display(context, program_state) {
@@ -68,6 +86,9 @@ export class Assignment3 extends Scene {
         const yellow = hex_color("#fac91a");
         let model_transform = Mat4.identity();
 
+        model_transform = model_transform
+            .times(Mat4.translation(this.torusLocation.x,this.torusLocation.y,0))
+
         this.shapes.torus.draw(context, program_state, model_transform, this.materials.test.override({color: yellow}));
     }
 }
@@ -83,7 +104,7 @@ class Gouraud_Shader extends Shader {
 
     shared_glsl_code() {
         // ********* SHARED CODE, INCLUDED IN BOTH SHADERS *********
-        return ` 
+        return `
         precision mediump float;
         const int N_LIGHTS = ` + this.num_lights + `;
         uniform float ambient, diffusivity, specularity, smoothness;
@@ -96,20 +117,20 @@ class Gouraud_Shader extends Shader {
         // on to the next phase (fragment shader), then interpolated per-fragment, weighted by the
         // pixel fragment's proximity to each of the 3 vertices (barycentric interpolation).
         varying vec3 N, vertex_worldspace;
-        // ***** PHONG SHADING HAPPENS HERE: *****                                       
-        vec3 phong_model_lights( vec3 N, vec3 vertex_worldspace ){                                        
+        // ***** PHONG SHADING HAPPENS HERE: *****
+        vec3 phong_model_lights( vec3 N, vec3 vertex_worldspace ){
             // phong_model_lights():  Add up the lights' contributions.
             vec3 E = normalize( camera_center - vertex_worldspace );
             vec3 result = vec3( 0.0 );
             for(int i = 0; i < N_LIGHTS; i++){
-                // Lights store homogeneous coords - either a position or vector.  If w is 0, the 
-                // light will appear directional (uniform direction from all points), and we 
+                // Lights store homogeneous coords - either a position or vector.  If w is 0, the
+                // light will appear directional (uniform direction from all points), and we
                 // simply obtain a vector towards the light by directly using the stored value.
-                // Otherwise if w is 1 it will appear as a point light -- compute the vector to 
-                // the point light's location from the current surface point.  In either case, 
-                // fade (attenuate) the light as the vector needed to reach it gets longer.  
-                vec3 surface_to_light_vector = light_positions_or_vectors[i].xyz - 
-                                               light_positions_or_vectors[i].w * vertex_worldspace;                                             
+                // Otherwise if w is 1 it will appear as a point light -- compute the vector to
+                // the point light's location from the current surface point.  In either case,
+                // fade (attenuate) the light as the vector needed to reach it gets longer.
+                vec3 surface_to_light_vector = light_positions_or_vectors[i].xyz -
+                                               light_positions_or_vectors[i].w * vertex_worldspace;
                 float distance_to_light = length( surface_to_light_vector );
 
                 vec3 L = normalize( surface_to_light_vector );
@@ -119,7 +140,7 @@ class Gouraud_Shader extends Shader {
                 float diffuse  =      max( dot( N, L ), 0.0 );
                 float specular = pow( max( dot( N, H ), 0.0 ), smoothness );
                 float attenuation = 1.0 / (1.0 + light_attenuation_factors[i] * distance_to_light * distance_to_light );
-                
+
                 vec3 light_contribution = shape_color.xyz * light_colors[i].xyz * diffusivity * diffuse
                                                           + light_colors[i].xyz * specularity * specular;
                 result += attenuation * light_contribution;
@@ -131,13 +152,13 @@ class Gouraud_Shader extends Shader {
     vertex_glsl_code() {
         // ********* VERTEX SHADER *********
         return this.shared_glsl_code() + `
-            attribute vec3 position, normal;                            
+            attribute vec3 position, normal;
             // Position is expressed in object coordinates.
-            
+
             uniform mat4 model_transform;
             uniform mat4 projection_camera_model_transform;
-    
-            void main(){                                                                   
+
+            void main(){
                 // The vertex's final resting place (in NDCS):
                 gl_Position = projection_camera_model_transform * vec4( position, 1.0 );
                 // The final normal vector in screen space.
@@ -151,7 +172,7 @@ class Gouraud_Shader extends Shader {
         // A fragment is a pixel that's overlapped by the current triangle.
         // Fragments affect the final image or get discarded due to depth.
         return this.shared_glsl_code() + `
-            void main(){                                                           
+            void main(){
                 // Compute an initial (ambient) color:
                 gl_FragColor = vec4( shape_color.xyz * ambient, shape_color.w );
                 // Compute the final color with contributions from lights:
@@ -243,9 +264,9 @@ class Ring_Shader extends Shader {
         attribute vec3 position;
         uniform mat4 model_transform;
         uniform mat4 projection_camera_model_transform;
-        
+
         void main(){
-          
+
         }`;
     }
 
@@ -254,7 +275,7 @@ class Ring_Shader extends Shader {
         // TODO:  Complete the main function of the fragment shader (Extra Credit Part II).
         return this.shared_glsl_code() + `
         void main(){
-          
+
         }`;
     }
 }
