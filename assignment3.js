@@ -68,11 +68,11 @@ export class Assignment3 extends Scene {
     display(context, program_state) {
         // display():  Called once per frame of animation.
         // Setup -- This part sets up the scene's overall camera matrix, projection matrix, and lights:
-        if (!context.scratchpad.controls) {
-            this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
-            // Define the global camera and projection matrices, which are stored in program_state.
-            program_state.set_camera(this.initial_camera_location);
-        }
+        // if (!context.scratchpad.controls) {
+        //     this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
+        //     // Define the global camera and projection matrices, which are stored in program_state.
+        //     program_state.set_camera(this.initial_camera_location);
+        // }
 
         program_state.projection_transform = Mat4.perspective(
             Math.PI / 4, context.width / context.height, .1, 1000);
@@ -86,10 +86,14 @@ export class Assignment3 extends Scene {
         const yellow = hex_color("#fac91a");
         let model_transform = Mat4.identity();
 
-        model_transform = model_transform
+        let torus_transform = model_transform
             .times(Mat4.translation(this.torusLocation.x,this.torusLocation.y,0))
 
-        this.shapes.torus.draw(context, program_state, model_transform, this.materials.test.override({color: yellow}));
+
+        this.shapes.torus.draw(context, program_state, torus_transform, this.materials.test.override({color: yellow}));
+        this.shapes.torus.draw(context, program_state, model_transform, this.materials.test);
+
+        program_state.set_camera(Mat4.inverse(torus_transform).times(Mat4.translation(0,0,-15)))
     }
 }
 
