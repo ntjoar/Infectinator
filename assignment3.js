@@ -16,6 +16,7 @@ export class Assignment3 extends Scene {
 
         // At the beginning of our program, load one of each of these shape definitions onto the GPU.
         this.shapes = {
+            bullet: new defs.Subdivision_Sphere(4),
             torus: new defs.Torus(15, 15),
             torus2: new defs.Torus(3, 15),
             sphere: new defs.Subdivision_Sphere(4),
@@ -31,9 +32,18 @@ export class Assignment3 extends Scene {
             test2: new Material(new Gouraud_Shader(),
                 {ambient: .4, diffusivity: .6, color: hex_color("#992828")}),
             ring: new Material(new Ring_Shader()),
+            bullet:  new Material(new defs.Phong_Shader(), {
+                color: color(0, 0, 1, 1),
+                ambient: .3,
+                diffusivity: 1,
+                specularity: .5
+            }),
             // TODO:  Fill in as many additional material objects as needed in this key/value table.
             //        (Requirement 4)
         }
+
+        this.bullets = [];
+        this.bulletPositions = [];
 
         this.initial_camera_location = Mat4.look_at(vec3(0, 10, 20), vec3(0, 0, 0), vec3(0, 1, 0));
     }
@@ -63,6 +73,12 @@ export class Assignment3 extends Scene {
         this.key_triggered_button("Down", ["s"], () => {
             this.torusLocation.y += -0.5
         });
+        this.key_triggered_button("Shoot", ["p"], this.firebullet)
+    }
+
+    firebullet() {
+        this.bullets.push(this.materials.bullet);
+        this.bulletPositions.push(Mat4.identity().times(Mat4.translation(this.torusLocation.x,this.torusLocation.y,0)));
     }
 
     display(context, program_state) {
@@ -74,6 +90,12 @@ export class Assignment3 extends Scene {
         //     program_state.set_camera(this.initial_camera_location);
         // }
 
+        if (!context.scratchpad.controls) { 
+            this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
+            // Define the global camera and projection matrices, which are stored in program_state.
+            program_state.set_camera(this.initial_camera_location);
+        }
+
         program_state.projection_transform = Mat4.perspective(
             Math.PI / 4, context.width / context.height, .1, 1000);
 
@@ -83,17 +105,26 @@ export class Assignment3 extends Scene {
 
         // TODO:  Fill in matrix operations and drawing code to draw the solar system scene (Requirements 3 and 4)
         const t = program_state.animation_time / 1000, dt = program_state.animation_delta_time / 1000;
-        const yellow = hex_color("#fac91a");
         let model_transform = Mat4.identity();
 
         let torus_transform = model_transform
             .times(Mat4.translation(this.torusLocation.x,this.torusLocation.y,0))
 
+        this.shapes.torus.draw(context, program_state, torus_transform, this.materials.test);
 
-        this.shapes.torus.draw(context, program_state, torus_transform, this.materials.test.override({color: yellow}));
-        this.shapes.torus.draw(context, program_state, model_transform, this.materials.test);
+        for(let i = 0; i < this.bullets.length; i++) {
+            this.bulletPositions[i] = this.bulletPositions[i].times(Mat4.translation(0.5, 0 , 0));
 
-        program_state.set_camera(Mat4.inverse(torus_transform).times(Mat4.translation(0,0,-15)))
+            // if not out of bounds
+            if(true) {  
+                this.shapes.bullet.draw(context, program_state, this.bulletPositions[i], this.bullets[i]);
+            } else { // else we remove it from the array 
+                this.bulletPositions.pop();
+                this.bullets.pop();
+            }
+
+        }
+
     }
 }
 
