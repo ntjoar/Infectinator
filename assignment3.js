@@ -114,6 +114,13 @@ export class Assignment3 extends Scene {
             x: 0,
             y: 0
         }
+        this.xpositions = [];
+        this.ypositions = [];
+        for(let i = 1; i < 11; i++) {
+            this.set_cell_xpositions(i);
+            this.set_cell_ypositions(i);
+        }
+
 
         // At the beginning of our program, load one of each of these shape definitions onto the GPU.
         this.shapes = {
@@ -129,16 +136,59 @@ export class Assignment3 extends Scene {
         // *** Materials
         this.materials = {
             test: new Material(new defs.Phong_Shader(),
-                {ambient: .4, diffusivity: .6, color: hex_color("#ffffff")},
+                {ambient: .4, diffusivity: .6, color: hex_color("#ffffff")}),
             test2: new Material(new Gouraud_Shader(),
                 {ambient: .4, diffusivity: .6, color: hex_color("#992828")}),
-            ring: new Material(new Ring_Shader()),
+            ring: new Material(new Ring_Shader())
             // TODO:  Fill in as many additional material objects as needed in this key/value table.
             //        (Requirement 4)
         }
-
         this.initial_camera_location = Mat4.look_at(vec3(0, 10, 20), vec3(0, 0, 0), vec3(0, 1, 0));
     }
+    // ALREADY FIXED THE PROBLEM OF CAN ONLY CHECK DIST < 0.1
+    // If want them father, multiply the positions by a larger number when translating them
+    set_cell_xpositions(i) {
+        this.xpositions[i] = Math.random();
+        // check other cells' x-coord to decrease chance of overlap
+        for(let j = i-1; j >= 0; j--) {
+            let dist = Math.abs((10*this.xpositions[i]) - (10*this.xpositions[j]));
+            if(dist < 0.6)
+                this.set_cell_xpositions(i);
+        }
+    }
+    set_cell_ypositions(i) {
+        this.ypositions[i] = Math.random();
+        // check other cells' y-coord to decrease chance of overlap
+        for(let j = i-1; j >= 0; j--) {
+            let dist = Math.abs((10 * this.ypositions[i]) - (10 * this.ypositions[j]));
+            if (dist < 0.6)
+                this.set_cell_ypositions(i);
+        }
+    }
+    // set_cell_xpositions() {
+    //     for(let i = 1; i < 11; i++) {
+    //         this.xpositions[i] = Math.random();
+    //         // check other cells' x-coord to decrease chance of overlap
+    //         for(let j = i-1; j >= 0; j--) {
+    //             let dist = Math.abs((10*this.xpositions[i]) - (10*this.xpositions[j]));
+    //             if(dist < 0.1)
+    //                 this.set_cell_xpositions();
+    //         }
+    //     }
+    // }
+    // set_cell_ypositions() {
+    //     for(let i = 1; i < 11; i++) {
+    //         this.ypositions[i] = Math.random();
+    //         // check other cells' y-coord to decrease chance of overlap
+    //         for(let j = i-1; j >= 0; j--) {
+    //             let dist = Math.abs((10 * this.ypositions[i]) - (10 * this.ypositions[j]));
+    //             if (dist < 0.1)
+    //                 this.set_cell_ypositions();
+    //         }
+    //     }
+    // }
+
+
 
     make_control_panel() {
         // Draw the scene's buttons, setup their actions and keyboard shortcuts, and monitor live measurements.
@@ -194,7 +244,25 @@ export class Assignment3 extends Scene {
 
         this.shapes.torus.draw(context, program_state, torus_transform, this.materials.test.override({color: yellow}));
         this.shapes.torus.draw(context, program_state, model_transform, this.materials.test);
+        // let test_transform = Mat4.identity().times(Mat4.translation(5,5,0)).times(Mat4.scale(0.5,0.5,0.5));
+        // this.shapes.sphere.draw(context, program_state, test_transform, this.materials.test.override({color: yellow}));
 
+        // this.shapes.covid.draw(context, program_state, model_transform, this.materials.test);
+
+        let cell_transform = Mat4.identity();
+        for (let i = 0; i < 10; i++) {
+            if (i < 5) {
+                cell_transform = Mat4.identity()
+                    .times(Mat4.translation(10 * this.xpositions[i], 10 * this.ypositions[i], 0))
+                    .times(Mat4.scale(0.3, 0.3, 0.3))
+            }
+            else {
+                cell_transform = Mat4.identity()
+                    .times(Mat4.translation(-10 * this.xpositions[i], -10 * this.ypositions[i], 0))
+                    .times(Mat4.scale(0.3, 0.3, 0.3))
+            }
+            this.shapes.sphere.draw(context, program_state, cell_transform, this.materials.test);
+        }
         program_state.set_camera(Mat4.inverse(torus_transform).times(Mat4.translation(0,0,-15)))
     }
 }
