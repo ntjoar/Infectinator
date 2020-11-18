@@ -13,6 +13,13 @@ export class Assignment3 extends Scene {
             x: 0,
             y: 0
         }
+        this.xpositions = [];
+        this.ypositions = [];
+        for(let i = 1; i < 11; i++) {
+            this.set_cell_xpositions(i);
+            this.set_cell_ypositions(i);
+        }
+
 
         // At the beginning of our program, load one of each of these shape definitions onto the GPU.
         this.shapes = {
@@ -44,23 +51,38 @@ export class Assignment3 extends Scene {
 
         this.bullets = [];
         this.bulletPositions = [];
+        this.virus = Mat4.identity();
+    }
 
-        this.initial_camera_location = Mat4.look_at(vec3(0, 10, 20), vec3(0, 0, 0), vec3(0, 1, 0));
+    // ALREADY FIXED THE PROBLEM OF CAN ONLY CHECK DIST < 0.1
+    // If want them father, multiply the positions by a larger number when translating them
+    set_cell_xpositions(i) {
+        this.xpositions[i] = Math.random();
+        // check other cells' x-coord to decrease chance of overlap
+        for(let j = i-1; j >= 0; j--) {
+            let dist = Math.abs((10*this.xpositions[i]) - (10*this.xpositions[j]));
+            if(dist < 0.6)
+                this.set_cell_xpositions(i);
+        }
+    }
+    set_cell_ypositions(i) {
+        this.ypositions[i] = Math.random();
+        // check other cells' y-coord to decrease chance of overlap
+        for(let j = i-1; j >= 0; j--) {
+            let dist = Math.abs((10 * this.ypositions[i]) - (10 * this.ypositions[j]));
+            if (dist < 0.6)
+                this.set_cell_ypositions(i);
+        }
     }
 
     make_control_panel() {
         // Draw the scene's buttons, setup their actions and keyboard shortcuts, and monitor live measurements.
-        this.key_triggered_button("View solar system", ["Control", "0"], () => this.attached = () => this.initial_camera_location);
-        this.new_line();
-        this.key_triggered_button("Attach to planet 1", ["Control", "1"], () => this.attached = () => this.planet_1);
-        this.key_triggered_button("Attach to planet 2", ["Control", "2"], () => this.attached = () => this.planet_2);
-        this.new_line();
-        this.key_triggered_button("Attach to planet 3", ["Control", "3"], () => this.attached = () => this.planet_3);
-        this.key_triggered_button("Attach to planet 4", ["Control", "4"], () => this.attached = () => this.planet_4);
-        this.new_line();
-        this.key_triggered_button("Attach to planet 5", ["Control", "5"], () => this.attached = () => this.planet_5);
-        this.key_triggered_button("Attach to moon", ["Control", "m"], () => this.attached = () => this.moon);
-
+        this.key_triggered_button("Fixed View", ["b"], () => this.attached = () => 
+        Mat4.look_at(
+        vec3(this.virus[0][3], this.virus[1][3], this.virus[2][3] + 1), 
+        vec3(this.virus[0][3], this.virus[1][3], this.virus[2][3]), 
+        vec3(0, 1, 1)));
+        
         this.key_triggered_button("Left", ["a"], () => {
             this.torusLocation.x += -0.5
         });
@@ -78,22 +100,16 @@ export class Assignment3 extends Scene {
 
     firebullet() {
         this.bullets.push(this.materials.bullet);
-        this.bulletPositions.push(Mat4.identity().times(Mat4.translation(this.torusLocation.x,this.torusLocation.y,0)));
+        this.bulletPositions.push(Mat4.identity()
+        .times(Mat4.translation(this.torusLocation.x,this.torusLocation.y,0)
+        .times(Mat4.scale(0.2, 0.2, 0.2))));
     }
 
     display(context, program_state) {
         // display():  Called once per frame of animation.
         // Setup -- This part sets up the scene's overall camera matrix, projection matrix, and lights:
-        // if (!context.scratchpad.controls) {
-        //     this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
-        //     // Define the global camera and projection matrices, which are stored in program_state.
-        //     program_state.set_camera(this.initial_camera_location);
-        // }
-
         if (!context.scratchpad.controls) { 
             this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
-            // Define the global camera and projection matrices, which are stored in program_state.
-            program_state.set_camera(this.initial_camera_location);
         }
 
         program_state.projection_transform = Mat4.perspective(
@@ -107,24 +123,44 @@ export class Assignment3 extends Scene {
         const t = program_state.animation_time / 1000, dt = program_state.animation_delta_time / 1000;
         let model_transform = Mat4.identity();
 
-        let torus_transform = model_transform
-            .times(Mat4.translation(this.torusLocation.x,this.torusLocation.y,0))
+        let torus_transform = model_transform.times(Mat4.translation(this.torusLocation.x,this.torusLocation.y,0))
+        this.virus = torus_transform;
 
         this.shapes.torus.draw(context, program_state, torus_transform, this.materials.test);
 
+        let cell_transform = Mat4.identity();
+        for (let i = 0; i < 10; i++) {
+            if (i < 5) {
+                cell_transform = Mat4.identity()
+                    .times(Mat4.translation(10 * this.xpositions[i], 10 * this.ypositions[i], 0))
+                    .times(Mat4.scale(0.3, 0.3, 0.3))
+            }
+            else {
+                cell_transform = Mat4.identity()
+                    .times(Mat4.translation(-10 * this.xpositions[i], -10 * this.ypositions[i], 0))
+                    .times(Mat4.scale(0.3, 0.3, 0.3))
+            }
+            this.shapes.sphere.draw(context, program_state, cell_transform, this.materials.test);
+        }
+        if(this.attached) {
+            if (this.attached() !== this.initial_camera_location) {
+                program_state.set_camera(this.attached().times(Mat4.translation(0, 0, -100))
+                  .map((x, i) => Vector.from(program_state.camera_transform[i]).mix(x, .3)));
+            }
+        }
+
         for(let i = 0; i < this.bullets.length; i++) {
-            this.bulletPositions[i] = this.bulletPositions[i].times(Mat4.translation(0.5, 0 , 0));
+            this.bulletPositions[i] = this.bulletPositions[i].times(Mat4.translation(0, 2 , 0));
 
             // if not out of bounds
             if(true) {  
                 this.shapes.bullet.draw(context, program_state, this.bulletPositions[i], this.bullets[i]);
             } else { // else we remove it from the array 
-                this.bulletPositions.pop();
-                this.bullets.pop();
+                this.bulletPositions.shift();
+                this.bullets.shift();
             }
 
         }
-
     }
 }
 
