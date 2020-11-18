@@ -15,9 +15,11 @@ export class Assignment3 extends Scene {
         }
         this.xpositions = [];
         this.ypositions = [];
+        this.infected = Array(10).fill(0).map(x => false);
+        // need to start from i = 1 so that in set_cell, we won't be accessing index -1
         for(let i = 1; i < 11; i++) {
-            this.set_cell_xpositions(i);
-            this.set_cell_ypositions(i);
+            this.set_cell_xpositions(i-1);
+            this.set_cell_ypositions(i-1);
         }
 
 
@@ -55,21 +57,31 @@ export class Assignment3 extends Scene {
     }
 
     // ALREADY FIXED THE PROBLEM OF CAN ONLY CHECK DIST < 0.1
-    // If want them father, multiply the positions by a larger number when translating them
+    // If want them father, multiply the Math.random() by a larger number
     set_cell_xpositions(i) {
-        this.xpositions[i] = Math.random();
+        if(i < 5) {
+            this.xpositions[i] = 10*Math.random();
+        }
+        else {
+            this.xpositions[i] = -10*Math.random();
+        }
         // check other cells' x-coord to decrease chance of overlap
         for(let j = i-1; j >= 0; j--) {
-            let dist = Math.abs((10*this.xpositions[i]) - (10*this.xpositions[j]));
+            let dist = Math.abs((this.xpositions[i]) - (this.xpositions[j]));
             if(dist < 0.6)
                 this.set_cell_xpositions(i);
         }
     }
     set_cell_ypositions(i) {
-        this.ypositions[i] = Math.random();
+        if(i < 5) {
+            this.ypositions[i] = 10*Math.random();
+        }
+        else {
+            this.ypositions[i] = -10*Math.random();
+        }
         // check other cells' y-coord to decrease chance of overlap
         for(let j = i-1; j >= 0; j--) {
-            let dist = Math.abs((10 * this.ypositions[i]) - (10 * this.ypositions[j]));
+            let dist = Math.abs((this.ypositions[i]) - (this.ypositions[j]));
             if (dist < 0.6)
                 this.set_cell_ypositions(i);
         }
@@ -130,17 +142,15 @@ export class Assignment3 extends Scene {
 
         let cell_transform = Mat4.identity();
         for (let i = 0; i < 10; i++) {
-            if (i < 5) {
+            if(this.infected[i] === false) {
                 cell_transform = Mat4.identity()
-                    .times(Mat4.translation(10 * this.xpositions[i], 10 * this.ypositions[i], 0))
+                    .times(Mat4.translation(this.xpositions[i], this.ypositions[i], 0))
                     .times(Mat4.scale(0.3, 0.3, 0.3))
+                this.shapes.sphere.draw(context, program_state, cell_transform, this.materials.test);
             }
             else {
-                cell_transform = Mat4.identity()
-                    .times(Mat4.translation(-10 * this.xpositions[i], -10 * this.ypositions[i], 0))
-                    .times(Mat4.scale(0.3, 0.3, 0.3))
+                // DO SMTH ONCE INFECTED
             }
-            this.shapes.sphere.draw(context, program_state, cell_transform, this.materials.test);
         }
         if(this.attached) {
             if (this.attached() !== this.initial_camera_location) {
@@ -151,15 +161,19 @@ export class Assignment3 extends Scene {
 
         for(let i = 0; i < this.bullets.length; i++) {
             this.bulletPositions[i] = this.bulletPositions[i].times(Mat4.translation(0, 2 , 0));
-
-            // if not out of bounds
-            if(true) {  
+            // check if the bullet hits a cell
+            for(let j = 0; j < 10; j++) {
+                if ((this.bulletPositions[i] === this.ypositions[j]) && (this.torusLocation.x === this.xpositions[j])) {
+                    this.infected[j] = true;
+                }
+            }
+            // if not out of bounds and doesn't hit a cell
+            if(true && true) {
                 this.shapes.bullet.draw(context, program_state, this.bulletPositions[i], this.bullets[i]);
             } else { // else we remove it from the array 
                 this.bulletPositions.shift();
                 this.bullets.shift();
             }
-
         }
     }
 }
