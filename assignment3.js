@@ -15,6 +15,7 @@ export class Assignment3 extends Scene {
         }
         this.xpositions = [];
         this.ypositions = [];
+        this.cell_transform = Array(10).fill(0).map(x => Mat4.identity());
         this.infected = Array(10).fill(0).map(x => false);
         // need to start from i = 1 so that in set_cell, we won't be accessing index -1
         for(let i = 1; i < 11; i++) {
@@ -52,6 +53,7 @@ export class Assignment3 extends Scene {
         }
 
         this.bullets = [];
+        this.removebullet = false;
         this.bulletPositions = [];
         this.virus = Mat4.identity();
     }
@@ -140,16 +142,16 @@ export class Assignment3 extends Scene {
 
         this.shapes.torus.draw(context, program_state, torus_transform, this.materials.test);
 
-        let cell_transform = Mat4.identity();
         for (let i = 0; i < 10; i++) {
+            // console.log(this.infected[i]);
             if(this.infected[i] === false) {
-                cell_transform = Mat4.identity()
+                this.cell_transform[i] = Mat4.identity()
                     .times(Mat4.translation(this.xpositions[i], this.ypositions[i], 0))
                     .times(Mat4.scale(0.3, 0.3, 0.3))
-                this.shapes.sphere.draw(context, program_state, cell_transform, this.materials.test);
+                this.shapes.sphere.draw(context, program_state, this.cell_transform[i], this.materials.test);
             }
             else {
-                // DO SMTH ONCE INFECTED
+                this.shapes.torus.draw(context, program_state, this.cell_transform[i], this.materials.test);
             }
         }
         if(this.attached) {
@@ -160,17 +162,22 @@ export class Assignment3 extends Scene {
         }
 
         for(let i = 0; i < this.bullets.length; i++) {
+            this.removebullet = false;
             this.bulletPositions[i] = this.bulletPositions[i].times(Mat4.translation(0, 2 , 0));
+            // console.log((this.bulletPositions[0])[1][3]);
             // check if the bullet hits a cell
             for(let j = 0; j < 10; j++) {
-                if ((this.bulletPositions[i] === this.ypositions[j]) && (this.torusLocation.x === this.xpositions[j])) {
-                    this.infected[j] = true;
+                if ((this.bulletPositions[i][0][3] >= this.xpositions[j] - 0.3) && (this.bulletPositions[i][0][3] <= this.xpositions[j] + 0.3)) {
+                    if ((this.bulletPositions[i][1][3] >= this.ypositions[j] - 0.3) && (this.bulletPositions[i][1][3] <= this.ypositions[j] + 0.3)) {
+                        this.infected[j] = true;
+                        this.removebullet = true;
+                    }
                 }
             }
             // if not out of bounds and doesn't hit a cell
-            if(true && true) {
+            if(this.removebullet === false) {
                 this.shapes.bullet.draw(context, program_state, this.bulletPositions[i], this.bullets[i]);
-            } else { // else we remove it from the array 
+            } else { // else we remove it from the array
                 this.bulletPositions.shift();
                 this.bullets.shift();
             }
