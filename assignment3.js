@@ -114,9 +114,20 @@ export class Assignment3 extends Scene {
             x: 0,
             y: 0
         }
+        this.xpositions = [];
+        this.ypositions = [];
+        this.cell_transform = Array(10).fill(0).map(x => Mat4.identity());
+        this.infected = Array(10).fill(0).map(x => false);
+        // need to start from i = 1 so that in set_cell, we won't be accessing index -1
+        for(let i = 1; i < 11; i++) {
+            this.set_cell_xpositions(i-1);
+            this.set_cell_ypositions(i-1);
+        }
+
 
         // At the beginning of our program, load one of each of these shape definitions onto the GPU.
         this.shapes = {
+            bullet: new defs.Subdivision_Sphere(4),
             torus: new defs.Torus(15, 15),
             torus2: new defs.Torus(3, 15),
             sphere: new defs.Subdivision_Sphere(4),
@@ -133,26 +144,61 @@ export class Assignment3 extends Scene {
             test2: new Material(new Gouraud_Shader(),
                 {ambient: .4, diffusivity: .6, color: hex_color("#992828")}),
             ring: new Material(new Ring_Shader()),
+            bullet:  new Material(new defs.Phong_Shader(), {
+                color: color(0, 0, 1, 1),
+                ambient: .3,
+                diffusivity: 1,
+                specularity: .5
+            }),
             // TODO:  Fill in as many additional material objects as needed in this key/value table.
             //        (Requirement 4)
         }
 
-        this.initial_camera_location = Mat4.look_at(vec3(0, 10, 20), vec3(0, 0, 0), vec3(0, 1, 0));
+        this.bullets = [];
+        this.removebullet = false;
+        this.bulletPositions = [];
+        this.virus = Mat4.identity();
+    }
+
+    // ALREADY FIXED THE PROBLEM OF CAN ONLY CHECK DIST < 0.1
+    // If want them father, multiply the Math.random() by a larger number
+    set_cell_xpositions(i) {
+        if(i < 5) {
+            this.xpositions[i] = 10*Math.random();
+        }
+        else {
+            this.xpositions[i] = -10*Math.random();
+        }
+        // check other cells' x-coord to decrease chance of overlap
+        for(let j = i-1; j >= 0; j--) {
+            let dist = Math.abs((this.xpositions[i]) - (this.xpositions[j]));
+            if(dist < 0.6)
+                this.set_cell_xpositions(i);
+        }
+    }
+    set_cell_ypositions(i) {
+        if(i < 5) {
+            this.ypositions[i] = 10*Math.random();
+        }
+        else {
+            this.ypositions[i] = -10*Math.random();
+        }
+        // check other cells' y-coord to decrease chance of overlap
+        for(let j = i-1; j >= 0; j--) {
+            let dist = Math.abs((this.ypositions[i]) - (this.ypositions[j]));
+            if (dist < 0.6)
+                this.set_cell_ypositions(i);
+        }
     }
 
     make_control_panel() {
         // Draw the scene's buttons, setup their actions and keyboard shortcuts, and monitor live measurements.
-        this.key_triggered_button("View solar system", ["Control", "0"], () => this.attached = () => this.initial_camera_location);
-        this.new_line();
-        this.key_triggered_button("Attach to planet 1", ["Control", "1"], () => this.attached = () => this.planet_1);
-        this.key_triggered_button("Attach to planet 2", ["Control", "2"], () => this.attached = () => this.planet_2);
-        this.new_line();
-        this.key_triggered_button("Attach to planet 3", ["Control", "3"], () => this.attached = () => this.planet_3);
-        this.key_triggered_button("Attach to planet 4", ["Control", "4"], () => this.attached = () => this.planet_4);
-        this.new_line();
-        this.key_triggered_button("Attach to planet 5", ["Control", "5"], () => this.attached = () => this.planet_5);
-        this.key_triggered_button("Attach to moon", ["Control", "m"], () => this.attached = () => this.moon);
-
+        this.key_triggered_button("Fixed View", ["b"], () => this.attached = () => 
+        Mat4.look_at(
+        vec3(this.virus[0][3], this.virus[1][3], this.virus[2][3] + 1), 
+        vec3(this.virus[0][3], this.virus[1][3], this.virus[2][3]), 
+        vec3(0, 1, 1)));
+        
         this.key_triggered_button("Left", ["a"], () => {
             this.torusLocation.x += -0.05
         });
@@ -165,16 +211,22 @@ export class Assignment3 extends Scene {
         this.key_triggered_button("Down", ["s"], () => {
             this.torusLocation.y += -0.05
         });
+        this.key_triggered_button("Shoot", ["p"], this.firebullet)
+    }
+
+    firebullet() {
+        this.bullets.push(this.materials.bullet);
+        this.bulletPositions.push(Mat4.identity()
+        .times(Mat4.translation(this.torusLocation.x,this.torusLocation.y,0)
+        .times(Mat4.scale(0.2, 0.2, 0.2))));
     }
 
     display(context, program_state) {
         // display():  Called once per frame of animation.
         // Setup -- This part sets up the scene's overall camera matrix, projection matrix, and lights:
-        // if (!context.scratchpad.controls) {
-        //     this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
-        //     // Define the global camera and projection matrices, which are stored in program_state.
-        //     program_state.set_camera(this.initial_camera_location);
-        // }
+        if (!context.scratchpad.controls) { 
+            this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
+        }
 
         program_state.projection_transform = Mat4.perspective(
             Math.PI / 4, context.width / context.height, .1, 1000);
@@ -185,17 +237,53 @@ export class Assignment3 extends Scene {
 
         // TODO:  Fill in matrix operations and drawing code to draw the solar system scene (Requirements 3 and 4)
         const t = program_state.animation_time / 1000, dt = program_state.animation_delta_time / 1000;
-        const yellow = hex_color("#fac91a");
         let model_transform = Mat4.identity();
 
-        let torus_transform = model_transform
-            .times(Mat4.translation(this.torusLocation.x,this.torusLocation.y,0))
+        let torus_transform = model_transform.times(Mat4.translation(this.torusLocation.x,this.torusLocation.y,0))
+        this.virus = torus_transform;
 
+        this.shapes.torus.draw(context, program_state, torus_transform, this.materials.test);
 
-        this.shapes.torus.draw(context, program_state, torus_transform, this.materials.test.override({color: yellow}));
-        this.shapes.torus.draw(context, program_state, model_transform, this.materials.test);
+        for (let i = 0; i < 10; i++) {
+            // console.log(this.infected[i]);
+            if(this.infected[i] === false) {
+                this.cell_transform[i] = Mat4.identity()
+                    .times(Mat4.translation(this.xpositions[i], this.ypositions[i], 0))
+                    .times(Mat4.scale(0.3, 0.3, 0.3))
+                this.shapes.sphere.draw(context, program_state, this.cell_transform[i], this.materials.test);
+            }
+            else {
+                this.shapes.torus.draw(context, program_state, this.cell_transform[i], this.materials.test);
+            }
+        }
+        if(this.attached) {
+            if (this.attached() !== this.initial_camera_location) {
+                program_state.set_camera(this.attached().times(Mat4.translation(0, 0, -100))
+                  .map((x, i) => Vector.from(program_state.camera_transform[i]).mix(x, .3)));
+            }
+        }
 
-        program_state.set_camera(Mat4.inverse(torus_transform).times(Mat4.translation(0,0,-15)))
+        for(let i = 0; i < this.bullets.length; i++) {
+            this.removebullet = false;
+            this.bulletPositions[i] = this.bulletPositions[i].times(Mat4.translation(0, 2 , 0));
+            // console.log((this.bulletPositions[0])[1][3]);
+            // check if the bullet hits a cell
+            for(let j = 0; j < 10; j++) {
+                if ((this.bulletPositions[i][0][3] >= this.xpositions[j] - 0.3) && (this.bulletPositions[i][0][3] <= this.xpositions[j] + 0.3)) {
+                    if ((this.bulletPositions[i][1][3] >= this.ypositions[j] - 0.3) && (this.bulletPositions[i][1][3] <= this.ypositions[j] + 0.3)) {
+                        this.infected[j] = true;
+                        this.removebullet = true;
+                    }
+                }
+            }
+            // if not out of bounds and doesn't hit a cell
+            if(this.removebullet === false) {
+                this.shapes.bullet.draw(context, program_state, this.bulletPositions[i], this.bullets[i]);
+            } else { // else we remove it from the array
+                this.bulletPositions.shift();
+                this.bullets.shift();
+            }
+        }
     }
 }
 
